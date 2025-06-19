@@ -43,6 +43,7 @@ def search_password():
         for line in s:
             if search in line:
                 print(line)
+                break
             else:
                 print("website password not saved yet")
 
