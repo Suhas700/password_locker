@@ -13,6 +13,17 @@ masterPass = ''
 nonce = ''
 
 
+def checkIfMasterExists():
+    lines = ''
+    with open(masterLocation, 'rb') as m:
+        lines = m.readlines()
+    
+    if len(lines) == 0:
+        return False
+    else:
+        return True
+
+
 def encryptPasswords(override=False):
     global decrypted
     if not override and not decrypted:
@@ -148,7 +159,12 @@ def locked_menu():
     if decrypted:
         encryptPasswords()
     unlocked = False
-    password = input('Enter your Master Password: ')
+    textprompt = ''
+    if checkIfMasterExists():
+        textprompt = 'Enter Master Password: '
+    else:
+        textprompt = 'Create Master Password: '
+    password = input(textprompt)
     validateMasterPassword(password)
 
 
@@ -262,10 +278,17 @@ def main_menu():
 atexit.register(encryptPasswords)
 
 
-locked_menu()
-while True:
-    main_menu()
-    print("\n\n")
+if __name__ == '__main__':
+    if not os.path.exists(passwordsLocation):
+        with open(passwordsLocation, 'w'):
+            print('Created passwords file.')
+    if not os.path.exists(masterLocation):
+        with open(masterLocation, 'w'):
+            print('Created master file.')
+    locked_menu()
+    while True:
+        main_menu()
+        print("\n\n")
 
 
                

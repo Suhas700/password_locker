@@ -3,7 +3,9 @@ from tkinter import ttk
 from Crypto.Cipher import AES
 from backports.pbkdf2 import pbkdf2_hmac
 from fragileBreak import fragile
+# from ttkthemes import ThemedTk
 import atexit
+import os
 
 
 passwordsLocation = 'passwords.txt'
@@ -27,7 +29,8 @@ mainframe.grid(column=0, row=0, padx=padX, pady=padY)
 root.columnconfigure(0, weight=1)
 root.rowconfigure(0, weight=1)
 s = ttk.Style()
-s.theme_use('alt')
+"""('winnative', 'clam', 'alt', 'default', 'classic', 'vista', 'xpnative')"""
+s.theme_use('classic')
 
 
 def exitApp():
@@ -158,6 +161,17 @@ def validateMasterPassword(password):
     unlockedMenu()
 
 
+def checkIfMasterExists():
+    lines = ''
+    with open(masterLocation, 'rb') as m:
+        lines = m.readlines()
+    
+    if len(lines) == 0:
+        return False
+    else:
+        return True
+
+
 def checkIfDecrypted():
     global decrypted
     item = ''
@@ -181,9 +195,14 @@ def lockedMenu():
         encryptPasswords()
     masterPass = ''
     
+    textprompt = ''
+    if checkIfMasterExists():
+        textprompt = 'Enter Master Password: '
+    else:
+        textprompt = 'Create Master Password: '
     masterPassVal = StringVar()
     ttk.Entry(mainframe, textvariable=masterPassVal).grid(column=2, row=2, sticky=(N, W, E, S), padx=padX, pady=padY)
-    ttk.Label(mainframe, text='Master Password: ').grid(column=1, row=2, sticky=(W), padx=padX, pady=padY)
+    ttk.Label(mainframe, text=textprompt).grid(column=1, row=2, sticky=(W), padx=padX, pady=padY)
     ttk.Button(mainframe, text='Submit', command=lambda: validateMasterPassword(masterPassVal.get())).grid(column=2, row=3, sticky=(S), padx=padX, pady=padY)
     root.mainloop()
 
@@ -275,6 +294,7 @@ def viewAllMenu():
     for i in range(len(keys)):
             item = lines[i].split('--------')
             if len(item) < 3: continue
+            ttk.Label(mainframe, text=str(i+1)+'. ').grid(column=0, row=i+2)
             ttk.Label(mainframe, text=keys[i] + '\t').grid(column=1, row=i+2, padx=padX, pady=padY)
             ttk.Label(mainframe, text=items[keys[i]]['username'] + '\t').grid(column=2, row=i+2, padx=padX, pady=padY)
             ttk.Label(mainframe, text=items[keys[i]]['password'] + '\t').grid(column=3, row=i+2, padx=padX, pady=padY)
@@ -282,7 +302,7 @@ def viewAllMenu():
     c.close()
 
 
-def searchMenu(deleted=False, deletedItem=''):
+def searchMenu(displayMessage=''):
     global root, mainframe, unlocked
     if not unlocked:
         lockedMenu()
@@ -293,8 +313,8 @@ def searchMenu(deleted=False, deletedItem=''):
     searchItem = StringVar()
     ttk.Label(mainframe, text='Enter item name to search for:').grid(column=2,row=1, padx=padX, pady=padY)
     ttk.Entry(mainframe, textvariable=searchItem).grid(column=2, row=2, padx=padX, pady=padY)
-    if deleted:
-        ttk.Label(mainframe, text='Deleted ' + deletedItem + ' successfully.').grid(column=2,row=5, padx=padX, pady=padY)
+    if displayMessage != '':
+        ttk.Label(mainframe, text=displayMessage).grid(column=2,row=5, padx=padX, pady=padY)
     ttk.Button(mainframe, text='Search', command=lambda: search(searchItem.get())).grid(column=2, row=3, padx=padX, pady=padY)
 
 
@@ -312,7 +332,7 @@ def deleteItem(itemToDel):
             if item == itemToDel:
                 continue
             p.write(f"{item}--------{items[item]['username']}--------{items[item]['password']}\n")
-    searchMenu(deleted=True, deletedItem=itemToDel)
+    searchMenu(displayMessage="Deleted " + itemToDel + " successfully.")
 
 
 
@@ -332,7 +352,7 @@ def search(searchItem):
         ttk.Button(mainframe, text='Edit', command=lambda: addNewMenu(searchItem, username, password, overwrite=searchItem)).grid(column=4, row=4, padx=padX, pady=padY)
         ttk.Button(mainframe, text='Delete', command=lambda: deleteItem(searchItem)).grid(column=5, row=4, padx=padX, pady=padY)
     else:
-        ttk.Label(mainframe, text='Item does not exist.').grid(column=2, row=4, padx=padX, pady=padY)
+        searchMenu(displayMessage='Item does not exist.')
 
 
 
@@ -343,4 +363,11 @@ atexit.register(exit_handler)
 
 
 if __name__ == '__main__':
+    if not os.path.exists(passwordsLocation):
+        with open(passwordsLocation, 'w'):
+            print('Created passwords file.')
+    if not os.path.exists(masterLocation):
+        with open(masterLocation, 'w'):
+            print('Created master file.')
+
     lockedMenu()    
