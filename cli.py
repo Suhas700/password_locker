@@ -257,7 +257,7 @@ def main_menu():
         decryptPasswords()
     print("----------PASSWORD LOCKER----------")
     print(" 1. Add/Edit password\n 2. View all passwords\n 3. Search for password\n 4. Delete a password\n 5. Exit")
-    option=int(input("enter the option you want to select: "))
+    option=int(input("Enter the option you want to select: "))
     print('------------------------------------\n\n\n')
     if option==1:
         add_or_edit_password()
@@ -269,11 +269,10 @@ def main_menu():
         itemToDel = input('Enter item name to delete: ')
         delete_password(itemToDel)
     elif option==5:
-        print("Exiting successfully..")
+        print("Exiting..")
         exit()
     else:
-        print("Wrong choice!!")
-        exit()
+        print("Invalid option.")
     
 atexit.register(encryptPasswords)
 
