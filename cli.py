@@ -28,6 +28,10 @@ def encryptPasswords(override=False):
     global decrypted
     if not override and not decrypted:
         return
+    with open(passwordsLocation, 'rb') as p:
+        if len(p.readlines()) == 0:
+            decrypted = False
+            return
     key = pbkdf2_hmac("sha256", masterPass.encode(), masterPass.encode(), 1024, 16)
     cipher = AES.new(key, AES.MODE_EAX)
     nonce = cipher.nonce
@@ -68,7 +72,10 @@ def decryptPasswords(override=False):
     global decrypted
     if not override and decrypted:
         return
-
+    with open(passwordsLocation, 'rb') as p:
+        if len(p.readlines()) == 0:
+            decrypted = True
+            return
     key = pbkdf2_hmac("sha256", masterPass.encode(), masterPass.encode(), 1024, 16)
     nonce = b''
     with open(masterLocation, 'rb') as m:
@@ -89,6 +96,7 @@ def decryptPasswords(override=False):
 
     with open(passwordsLocation, 'wb') as c:
         for line in decryptedFile:
+            if len(line.split(b'--------')) < 3: continue
             i = len(line) - 1
             while line[i] == 10 or line[i] == 13: i-=1
             c.write(line)
@@ -104,12 +112,15 @@ def validateMasterPassword(password):
     masterBytes = b''
     decryptedMasterBytes = b''
     with fragile(open(masterLocation, 'rb')) as m:
-        masterBytes = m.readline()
-        nonce = m.readline()
-        nonce = nonce[:len(nonce) - 1]
-        if nonce == b'' or masterBytes == b'':
+        allLines = m.readlines()
+        if len(allLines) < 2:
             masterPass = ''
             raise fragile.Break
+        masterBytes = allLines[0]
+        nonce = allLines[1]
+        if len(allLines) > 2:
+            nonce = nonce[:len(nonce) - 1]
+
         key = pbkdf2_hmac("sha256", password.encode(), password.encode(), 1024, 16)
         cipher = AES.new(key, AES.MODE_EAX, nonce)
         decryptedMasterBytes = cipher.decrypt(masterBytes)
@@ -257,18 +268,18 @@ def main_menu():
         decryptPasswords()
     print("----------PASSWORD LOCKER----------")
     print(" 1. Add/Edit password\n 2. View all passwords\n 3. Search for password\n 4. Delete a password\n 5. Exit")
-    option=int(input("Enter the option you want to select: "))
+    option=input("Enter the option you want to select: ")
     print('------------------------------------\n\n\n')
-    if option==1:
+    if option=='1':
         add_or_edit_password()
-    elif option==2:
+    elif option=='2':
         view_all()
-    elif option==3:
+    elif option=='3':
         search_password()
-    elif option==4:
+    elif option=='4':
         itemToDel = input('Enter item name to delete: ')
         delete_password(itemToDel)
-    elif option==5:
+    elif option=='5':
         print("Exiting..")
         exit()
     else:

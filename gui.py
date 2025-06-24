@@ -50,6 +50,10 @@ def encryptPasswords(override=False):
     global decrypted
     if not override and not decrypted:
         return
+    with open(passwordsLocation, 'rb') as p:
+        if len(p.readlines()) == 0:
+            decrypted = False
+            return
     key = pbkdf2_hmac("sha256", masterPass.encode(), masterPass.encode(), 1024, 16)
     cipher = AES.new(key, AES.MODE_EAX)
     nonce = cipher.nonce
@@ -89,7 +93,10 @@ def decryptPasswords(override=False):
     global decrypted
     if not override and decrypted:
         return
-
+    with open(passwordsLocation, 'rb') as p:
+        if len(p.readlines()) == 0:
+            decrypted = True
+            return
     key = pbkdf2_hmac("sha256", masterPass.encode(), masterPass.encode(), 1024, 16)
     nonce = b''
     with open(masterLocation, 'rb') as m:
@@ -110,6 +117,7 @@ def decryptPasswords(override=False):
 
     with open(passwordsLocation, 'wb') as c:
         for line in decryptedFile:
+            if len(line.split(b'--------')) < 3: continue
             i = len(line) - 1
             while line[i] == 10 or line[i] == 13: i-=1
             c.write(line)
@@ -125,12 +133,15 @@ def validateMasterPassword(password):
     masterBytes = b''
     decryptedMasterBytes = b''
     with fragile(open(masterLocation, 'rb')) as m:
-        masterBytes = m.readline()
-        nonce = m.readline()
-        nonce = nonce[:len(nonce) - 1]
-        if nonce == b'' or masterBytes == b'':
+        allLines = m.readlines()
+        if len(allLines) < 2:
             masterPass = ''
             raise fragile.Break
+        masterBytes = allLines[0]
+        nonce = allLines[1]
+        if len(allLines) > 2:
+            nonce = nonce[:len(nonce) - 1]
+        
         key = pbkdf2_hmac("sha256", password.encode(), password.encode(), 1024, 16)
         cipher = AES.new(key, AES.MODE_EAX, nonce)
         decryptedMasterBytes = cipher.decrypt(masterBytes)
