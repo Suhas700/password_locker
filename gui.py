@@ -2,14 +2,16 @@ from tkinter import *
 from tkinter import ttk
 from Crypto.Cipher import AES
 from backports.pbkdf2 import pbkdf2_hmac
-from fragileBreak import fragile
-# from ttkthemes import ThemedTk
+from lib.fragileBreak import fragile
+from lib.helpers import *
 import atexit
 import os
 
 
-passwordsLocation = 'passwords.txt'
-masterLocation = 'master.txt'
+passwordsLocation = os.path.join('.', 'data', 'passwords.txt')
+passwordNonceLocation = os.path.join('.', 'data', 'passwordnonce.txt')
+masterLocation = os.path.join('.', 'data', 'master.txt')
+masterNonceLocation = os.path.join('.', 'data', 'masternonce.txt')
 unlocked = False
 decrypted = False
 masterPass = ''
@@ -21,15 +23,13 @@ padY = (paddingVal, paddingVal)
 root = Tk()
 root.title("Password Locker")
 root.resizable(0, 0)
-# root.geometry("300x350")
 mainframe = ttk.Frame(root)
-# mainframe.pack_propagate(0)
 mainframe.pack(fill=BOTH, expand=1)
 mainframe.grid(column=0, row=0, padx=padX, pady=padY)
 root.columnconfigure(0, weight=1)
 root.rowconfigure(0, weight=1)
 s = ttk.Style()
-"""('winnative', 'clam', 'alt', 'default', 'classic', 'vista', 'xpnative')"""
+# themes = ('winnative', 'clam', 'alt', 'default', 'classic', 'vista', 'xpnative')
 s.theme_use('classic')
 
 
@@ -46,108 +46,31 @@ def removeAllWidgets(frame):
         # exitApp()
 
 
-def encryptPasswords(override=False):
-    global decrypted
-    if not override and not decrypted:
-        return
-    with open(passwordsLocation, 'rb') as p:
-        if len(p.readlines()) == 0:
-            decrypted = False
-            return
-    key = pbkdf2_hmac("sha256", masterPass.encode(), masterPass.encode(), 1024, 16)
-    cipher = AES.new(key, AES.MODE_EAX)
-    nonce = cipher.nonce
-    encryptedFile = []
-    masterData = []
-    firstTime = False
-
-    with open(masterLocation, 'rb') as m:
-        masterData = m.readlines()
-    if len(masterData) == 2:
-        masterData.append(nonce)
-        firstTime = True
-    else:
-        masterData[2] = nonce
-    with open(masterLocation, 'wb') as m:
-        m.write(masterData[0])
-        m.write(masterData[1])
-        if firstTime:
-            m.write(b'\n')
-        m.write(masterData[2])
-
-    with open(passwordsLocation, 'rb') as c:
-        for line in c:
-            if len(line.split(b'--------')) < 3: continue
-            i = len(line) - 1
-            while line[i] == 10 or line[i] == 13: i-=1
-            encryptedFile.append(cipher.encrypt(line[:i+1]))
-    with open(passwordsLocation, 'wb') as c:
-        for line in encryptedFile:
-            c.write(line)
-            c.write(b'\n')
-
-    decrypted = False
-
-
-def decryptPasswords(override=False):
-    global decrypted
-    if not override and decrypted:
-        return
-    with open(passwordsLocation, 'rb') as p:
-        if len(p.readlines()) == 0:
-            decrypted = True
-            return
-    key = pbkdf2_hmac("sha256", masterPass.encode(), masterPass.encode(), 1024, 16)
-    nonce = b''
-    with open(masterLocation, 'rb') as m:
-        masterData = m.readlines()
-
-    if (len(masterData) < 3):
-        encryptPasswords(override=True)
-        with open(masterLocation, 'rb') as m:
-            masterData = m.readlines()
-    nonce = masterData[2]
-
-    cipher = AES.new(key, AES.MODE_EAX, nonce)
-
-    decryptedFile = []
-    with open(passwordsLocation, 'rb') as c:
-        for line in c:
-            decryptedFile.append(cipher.decrypt(line[:len(line)-1]))
-
-    with open(passwordsLocation, 'wb') as c:
-        for line in decryptedFile:
-            if len(line.split(b'--------')) < 3: continue
-            i = len(line) - 1
-            while line[i] == 10 or line[i] == 13: i-=1
-            c.write(line)
-            c.write(b'\n')
-    
-    decrypted = True
-
-
-def validateMasterPassword(password):
+def validateMasterPassword(password, isNew):
     global unlocked, masterPass, nonce
+
+    if isNew:
+        correctPrint = 'Created Master Password.'
+    else:
+        correctPrint = 'Correct Password!'
 
     masterPass = ''
     masterBytes = b''
     decryptedMasterBytes = b''
+    nonce = b''
     with fragile(open(masterLocation, 'rb')) as m:
-        allLines = m.readlines()
-        if len(allLines) < 2:
+        masterBytes = m.read()
+        if len(masterBytes) == 0:
             masterPass = ''
             raise fragile.Break
-        masterBytes = allLines[0]
-        nonce = allLines[1]
-        if len(allLines) > 2:
-            nonce = nonce[:len(nonce) - 1]
-        
+        with open(masterNonceLocation, 'rb') as n:
+            nonce = n.read()
+
         key = pbkdf2_hmac("sha256", password.encode(), password.encode(), 1024, 16)
         cipher = AES.new(key, AES.MODE_EAX, nonce)
         decryptedMasterBytes = cipher.decrypt(masterBytes)
         try:
             masterPass = decryptedMasterBytes.decode()
-            masterPass = masterPass[:len(masterPass) - 1]
         except:
             ttk.Label(mainframe, text='Incorrect Password.').grid(column=2, row=4, padx=padX, pady=padY)
             return
@@ -159,71 +82,51 @@ def validateMasterPassword(password):
         encryptedPassword = cipher.encrypt(password.encode())
         with open(masterLocation, 'wb') as m:
             m.write(encryptedPassword)
-            m.write(b'\n')
-            m.write(nonce)
+        with open(masterNonceLocation, 'wb') as n:
+            n.write(nonce)
         unlocked = True
-        ttk.Label(mainframe, text='Correct Password!').grid(column=2, row=4, padx=padX, pady=padY)
+        masterPass = password
+        ttk.Label(mainframe, text=correctPrint).grid(column=2, row=4, padx=padX, pady=padY)
     elif masterPass == password:
         unlocked = True
-        ttk.Label(mainframe, text='Correct Password!').grid(column=2, row=4, padx=padX, pady=padY)
+        ttk.Label(mainframe, text=correctPrint).grid(column=2, row=4, padx=padX, pady=padY)
     else:
         ttk.Label(mainframe, text='Incorrect Password.').grid(column=2, row=4, padx=padX, pady=padY)
-
+    
     unlockedMenu()
 
-
-def checkIfMasterExists():
-    lines = ''
-    with open(masterLocation, 'rb') as m:
-        lines = m.readlines()
-    
-    if len(lines) == 0:
-        return False
-    else:
-        return True
-
-
-def checkIfDecrypted():
-    global decrypted
-    item = ''
-    try:
-        with open(passwordsLocation, 'r') as c:
-            item = c.readline()
-    except:
-        decrypted = False
-        return
-    if len(item.split('--------')) == 3:
-        decrypted = True
     
 
 def lockedMenu():
     global mainframe, root, unlocked, decrypted, masterPass
 
     unlocked = False
-    checkIfDecrypted()
+    decrypted = checkIfDecrypted(passwordsLocation)
     removeAllWidgets(mainframe)
     if decrypted:
-        encryptPasswords()
+        decrypted = encryptPasswords(passwordsLocation, passwordNonceLocation, masterPass, decrypted)
     masterPass = ''
     
     textprompt = ''
-    if checkIfMasterExists():
+    if checkIfMasterExists(masterLocation):
+        new = False
         textprompt = 'Enter Master Password: '
     else:
+        new = True
         textprompt = 'Create Master Password: '
     masterPassVal = StringVar()
     ttk.Entry(mainframe, textvariable=masterPassVal).grid(column=2, row=2, sticky=(N, W, E, S), padx=padX, pady=padY)
     ttk.Label(mainframe, text=textprompt).grid(column=1, row=2, sticky=(W), padx=padX, pady=padY)
-    ttk.Button(mainframe, text='Submit', command=lambda: validateMasterPassword(masterPassVal.get())).grid(column=2, row=3, sticky=(S), padx=padX, pady=padY)
+    ttk.Button(mainframe, text='Submit', command=lambda: validateMasterPassword(masterPassVal.get(), new)).grid(column=2, row=3, sticky=(S), padx=padX, pady=padY)
     root.mainloop()
 
 
 def unlockedMenu(displayMessage=''):
-    global root, mainframe, unlocked, decrypted
+    global root, mainframe, unlocked, decrypted, masterPass
     if not unlocked:
         lockedMenu()
     if not decrypted:
-        decryptPasswords()
+        decrypted = decryptPasswords(passwordsLocation, passwordNonceLocation, masterPass, decrypted)
 
     removeAllWidgets(mainframe)
     ttk.Button(mainframe, text='Add', command=addNewMenu).grid(column=2, row=1, padx=padX, pady=padY)
@@ -277,15 +180,6 @@ def saveItem(item, username, password, overwrite=''):
             c.write(f"{item}--------{items[item]['username']}--------{items[item]['password']}\n")
     
     unlockedMenu(displayMessage='Saved ' + item + ' successfully.')
-
-
-def parseToDict(items):
-    adict = {}
-    for item in items:
-        item_split = item.split('--------')
-        if len(item_split) < 3: continue
-        adict[item_split[0]] = {'username':item_split[1], 'password':item_split[2][:len(item_split[2]) - 1]}
-    return adict
 
 
 def viewAllMenu():
@@ -368,17 +262,14 @@ def search(searchItem):
 
 
 def exit_handler():
+    global decrypted, masterPass
     removeAllWidgets(mainframe)
-    encryptPasswords()
+    decrypted = encryptPasswords(passwordsLocation, passwordNonceLocation, masterPass, decrypted)
 atexit.register(exit_handler)
 
 
 if __name__ == '__main__':
-    if not os.path.exists(passwordsLocation):
-        with open(passwordsLocation, 'w'):
-            print('Created passwords file.')
-    if not os.path.exists(masterLocation):
-        with open(masterLocation, 'w'):
-            print('Created master file.')
+    
+    createRequiredDataFiles(passwordsLocation, passwordNonceLocation, masterLocation, masterNonceLocation)
 
     lockedMenu()    

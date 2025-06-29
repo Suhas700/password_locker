@@ -1,182 +1,43 @@
 import os
-from Crypto.Cipher import AES
-from backports.pbkdf2 import pbkdf2_hmac
-from fragileBreak import fragile
+from lib.helpers import *
 import atexit
 
 
-passwordsLocation = 'passwords.txt'
-masterLocation = 'master.txt'
+passwordsLocation = '.\\data\\passwords.txt'
+passwordNonceLocation = '.\\data\\passwordnonce.txt'
+masterLocation = '.\\data\\master.txt'
+masterNonceLocation = '.\\data\\masternonce.txt'
 unlocked = False
 decrypted = False
 masterPass = ''
 nonce = ''
 
 
-def checkIfMasterExists():
-    lines = ''
-    with open(masterLocation, 'rb') as m:
-        lines = m.readlines()
-    
-    if len(lines) == 0:
-        return False
-    else:
-        return True
-
-
-def encryptPasswords(override=False):
-    global decrypted
-    if not override and not decrypted:
-        return
-    with open(passwordsLocation, 'rb') as p:
-        if len(p.readlines()) == 0:
-            decrypted = False
-            return
-    key = pbkdf2_hmac("sha256", masterPass.encode(), masterPass.encode(), 1024, 16)
-    cipher = AES.new(key, AES.MODE_EAX)
-    nonce = cipher.nonce
-    encryptedFile = []
-    masterData = []
-    firstTime = False
-
-    with open(masterLocation, 'rb') as m:
-        masterData = m.readlines()
-    if len(masterData) == 2:
-        masterData.append(nonce)
-        firstTime = True
-    else:
-        masterData[2] = nonce
-    with open(masterLocation, 'wb') as m:
-        m.write(masterData[0])
-        m.write(masterData[1])
-        if firstTime:
-            m.write(b'\n')
-        m.write(masterData[2])
-
-    with open(passwordsLocation, 'rb') as c:
-        for line in c:
-            if len(line.split(b'--------')) < 3: continue
-            i = len(line) - 1
-            while line[i] == 10 or line[i] == 13: i-=1
-            encryptedFile.append(cipher.encrypt(line[:i+1]))
-
-    with open(passwordsLocation, 'wb') as c:
-        for line in encryptedFile:
-            c.write(line)
-            c.write(b'\n')
-
-    decrypted = False
-
-
-def decryptPasswords(override=False):
-    global decrypted
-    if not override and decrypted:
-        return
-    with open(passwordsLocation, 'rb') as p:
-        if len(p.readlines()) == 0:
-            decrypted = True
-            return
-    key = pbkdf2_hmac("sha256", masterPass.encode(), masterPass.encode(), 1024, 16)
-    nonce = b''
-    with open(masterLocation, 'rb') as m:
-        masterData = m.readlines()
-
-    if (len(masterData) < 3):
-        encryptPasswords(override=True)
-        with open(masterLocation, 'rb') as m:
-            masterData = m.readlines()
-    nonce = masterData[2]
-
-    cipher = AES.new(key, AES.MODE_EAX, nonce)
-
-    decryptedFile = []
-    with open(passwordsLocation, 'rb') as c:
-        for line in c:
-            decryptedFile.append(cipher.decrypt(line[:len(line)-1]))
-
-    with open(passwordsLocation, 'wb') as c:
-        for line in decryptedFile:
-            if len(line.split(b'--------')) < 3: continue
-            i = len(line) - 1
-            while line[i] == 10 or line[i] == 13: i-=1
-            c.write(line)
-            c.write(b'\n')
-    
-    decrypted = True
-
-
-def validateMasterPassword(password):
-    global unlocked, masterPass, nonce
-
-    masterPass = ''
-    masterBytes = b''
-    decryptedMasterBytes = b''
-    with fragile(open(masterLocation, 'rb')) as m:
-        allLines = m.readlines()
-        if len(allLines) < 2:
-            masterPass = ''
-            raise fragile.Break
-        masterBytes = allLines[0]
-        nonce = allLines[1]
-        if len(allLines) > 2:
-            nonce = nonce[:len(nonce) - 1]
-
-        key = pbkdf2_hmac("sha256", password.encode(), password.encode(), 1024, 16)
-        cipher = AES.new(key, AES.MODE_EAX, nonce)
-        decryptedMasterBytes = cipher.decrypt(masterBytes)
-        try:
-            masterPass = decryptedMasterBytes.decode()
-            masterPass = masterPass[:len(masterPass) - 1]
-        except:
-            print('Incorrect Password.')
-            return
-
-    if masterPass == '':
-        key = pbkdf2_hmac("sha256", password.encode(), password.encode(), 1024, 16)
-        cipher = AES.new(key, AES.MODE_EAX)
-        nonce = cipher.nonce
-        encryptedPassword = cipher.encrypt(password.encode())
-        with open(masterLocation, 'wb') as m:
-            m.write(encryptedPassword)
-            m.write(b'\n')
-            m.write(nonce)
-        unlocked = True
-        print('Correct Password!')
-    elif masterPass == password:
-        unlocked = True
-        print('Correct Password!')
-    else:
-        print('Incorrect Password.')
-
-
-def checkIfDecrypted():
-    global decrypted
-    item = ''
-    try:
-        with open(passwordsLocation, 'r') as c:
-            item = c.readline()
-    except:
-        decrypted = False
-        return
-    if len(item.split('--------')) == 3:
-        decrypted = True
-
 
 def locked_menu():
-    global masterPass, unlocked
-    checkIfDecrypted()
+    global masterPass, unlocked, decrypted
+
+    decrypted = checkIfDecrypted(passwordsLocation)
     if unlocked:
         main_menu()
     if decrypted:
-        encryptPasswords()
+        decrypted = encryptPasswords(passwordsLocation, passwordNonceLocation, masterPass, decrypted)
     unlocked = False
     textprompt = ''
-    if checkIfMasterExists():
+    if checkIfMasterExists(masterLocation):
+        new = False
         textprompt = 'Enter Master Password: '
     else:
+        new = True
         textprompt = 'Create Master Password: '
     password = input(textprompt)
-    validateMasterPassword(password)
+    unlocked = validateMasterPassword(masterLocation, masterNonceLocation, password)
+    if (unlocked):
+        if (new): print('Master Password successfully created.')
+        else: print('Correct Password!')
+        masterPass = password
+    else:
+        print('Incorrect Password.')
 
 
 def add_or_edit_password():
@@ -203,18 +64,13 @@ def saveItem(item, username, password):
 
 
 
-def parseToDict(items):
-    adict = {}
-    for item in items:
-        item_split = item.split('--------')
-        if len(item_split) < 3: continue
-        adict[item_split[0]] = {'username':item_split[1], 'password':item_split[2][:len(item_split[2]) - 1]}
-    return adict
-
-
 def view_all():
-    with open("passwords.txt",mode='r') as d:
-        items = parseToDict(d.readlines())
+    with open(passwordsLocation, mode='r') as d:
+        items = d.readlines()
+        if len(items) == 0:
+            print('No passwords have been stored.')
+            return
+        items = parseToDict(items)
         print("The details are:")
         justification = 0
         for key in items.keys():
@@ -231,7 +87,7 @@ def view_all():
 def search_password():
     search=input("enter the item name: ")
     print('\n search results:\n')
-    with open("passwords.txt",mode='r') as s:
+    with open(passwordsLocation, mode='r') as s:
         items = parseToDict(s.readlines())
         if search in items.keys():
             justification = max(len(search), len(items[search]['username']), len(items[search]['password']), 8) + 2
@@ -262,11 +118,12 @@ def delete_password(itemToDel):
     print('Deleted:', itemToDel, 'successfully.')
 
 def main_menu():
+    global unlocked, decrypted
     if not unlocked:
         locked_menu()
     if not decrypted:
-        decryptPasswords()
-    print("----------PASSWORD LOCKER----------")
+        decrypted = decryptPasswords(passwordsLocation, passwordNonceLocation, masterPass, decrypted)
+    print("\n----------PASSWORD LOCKER----------")
     print(" 1. Add/Edit password\n 2. View all passwords\n 3. Search for password\n 4. Delete a password\n 5. Exit")
     option=input("Enter the option you want to select: ")
     print('------------------------------------\n\n\n')
@@ -284,17 +141,18 @@ def main_menu():
         exit()
     else:
         print("Invalid option.")
-    
-atexit.register(encryptPasswords)
+
+def exit_handler():
+    global decrypted
+    decrypted = encryptPasswords(passwordsLocation, passwordNonceLocation, masterPass, decrypted)
+atexit.register(exit_handler)
+
 
 
 if __name__ == '__main__':
-    if not os.path.exists(passwordsLocation):
-        with open(passwordsLocation, 'w'):
-            print('Created passwords file.')
-    if not os.path.exists(masterLocation):
-        with open(masterLocation, 'w'):
-            print('Created master file.')
+    
+    createRequiredDataFiles(passwordsLocation, passwordNonceLocation, masterLocation, masterNonceLocation)
+
     locked_menu()
     while True:
         main_menu()
