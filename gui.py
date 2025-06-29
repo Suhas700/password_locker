@@ -193,16 +193,16 @@ def viewAllMenu():
     lines = c.readlines()
     items = parseToDict(lines)
     keys = list(items.keys())
-    ttk.Label(mainframe, text='ITEM NAME' + '\t').grid(column=1, row=1, padx=padX, pady=padY)
-    ttk.Label(mainframe, text='USERNAME' + '\t').grid(column=2, row=1, padx=padX, pady=padY)
-    ttk.Label(mainframe, text='PASSWORD' + '\t').grid(column=3, row=1, padx=padX, pady=padY)
+    ttk.Label(mainframe, text='ITEM NAME', font=("Arial", 10, "bold"), borderwidth=2, relief='flat', padding='5 5 5 5').grid(column=1, row=1, padx=padX, pady=padY, sticky=(W))
+    ttk.Label(mainframe, text='USERNAME', font=("Arial", 10, "bold"), borderwidth=2, relief='flat', padding='5 5 5 5').grid(column=2, row=1, padx=padX, pady=padY, sticky=(W))
+    ttk.Label(mainframe, text='PASSWORD', font=("Arial", 10, "bold"), borderwidth=2, relief='flat', padding='5 5 5 5').grid(column=3, row=1, padx=padX, pady=padY, sticky=(W))
     for i in range(len(keys)):
             item = lines[i].split('--------')
             if len(item) < 3: continue
-            ttk.Label(mainframe, text=str(i+1)+'. ').grid(column=0, row=i+2)
-            ttk.Label(mainframe, text=keys[i] + '\t').grid(column=1, row=i+2, padx=padX, pady=padY)
-            ttk.Label(mainframe, text=items[keys[i]]['username'] + '\t').grid(column=2, row=i+2, padx=padX, pady=padY)
-            ttk.Label(mainframe, text=items[keys[i]]['password'] + '\t').grid(column=3, row=i+2, padx=padX, pady=padY)
+            ttk.Label(mainframe, text='  ' + str(i+1)+'. ').grid(column=0, row=i+2)
+            ttk.Label(mainframe, text=keys[i], borderwidth=2, relief='flat', padding='5 5 5 5').grid(column=1, row=i+2, padx=padX, pady=padY, sticky=(W))
+            ttk.Label(mainframe, text=items[keys[i]]['username'], borderwidth=2, relief='flat', padding='5 5 5 5').grid(column=2, row=i+2, padx=padX, pady=padY, sticky=(W))
+            ttk.Label(mainframe, text=items[keys[i]]['password'], borderwidth=2, relief='flat', padding='5 5 5 5').grid(column=3, row=i+2, padx=padX, pady=padY, sticky=(W))
             
     c.close()
 

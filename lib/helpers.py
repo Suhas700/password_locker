@@ -37,14 +37,11 @@ def encryptPasswords(passwordsLocation, passwordNonceLocation, masterPass, decry
 
     with open(passwordsLocation, 'rb') as c:
         items = parseToDict(c.readlines(), bytesMode=True)
-    
-    for key in items.keys():
-        item = cipher.encrypt(key) + b'--------' + cipher.encrypt(items[key]['username']) + b'--------' + cipher.encrypt(items[key]['password'])
-        encryptedFile.append(item)
 
     with open(passwordsLocation, 'wb') as c:
-        for line in encryptedFile:
-            c.write(line)
+        for key in items.keys():
+            item = cipher.encrypt(key) + b'--------' + cipher.encrypt(items[key]['username']) + b'--------' + cipher.encrypt(items[key]['password'])
+            c.write(item)
             c.write(b'==-----==')
 
     return False
@@ -69,16 +66,13 @@ def decryptPasswords(passwordsLocation, passwordNonceLocation, masterPass, decry
         items = c.read()
 
     items = items.split(b'==-----==')
-    for item in items:
-        data = item.split(b'--------')
-        if (len(data) < 3): continue
-        decrypted_item = cipher.decrypt(data[0]) + b'--------' + cipher.decrypt(data[1]) + b'--------' + cipher.decrypt(data[2])
-        decryptedFile.append(decrypted_item)
 
     with open(passwordsLocation, 'wb') as c:
-        for line in decryptedFile:
-            if len(line.split(b'--------')) < 3: continue
-            c.write(line)
+        for item in items:
+            data = item.split(b'--------')
+            if (len(data) < 3): continue
+            decrypted_item = cipher.decrypt(data[0]) + b'--------' + cipher.decrypt(data[1]) + b'--------' + cipher.decrypt(data[2])
+            c.write(decrypted_item)
             c.write(b'\n')
     
     return True
